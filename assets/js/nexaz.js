@@ -186,6 +186,11 @@
                 'Auto': 'تلقائي',
                 'Custom colour': 'لون مخصص',
                 'Delete subject': 'حذف القسم',
+                'None': 'بدون',
+                'Cover from file': 'غلاف من محتوى الملف',
+                'Creating cover…': 'جارٍ إنشاء الغلاف…',
+                'Couldn’t create the cover': 'تعذّر إنشاء الغلاف',
+                'Cover reset to colour': 'عاد الغلاف إلى اللون',
                 'At least one subject must remain': 'لا يمكن حذف آخر قسم',
                 'Uncategorized': 'غير مصنّف',
                 'Delete this subject?': 'حذف هذا القسم؟',
@@ -499,13 +504,14 @@
                 });
                 const bk = S.books.filter(b => (subj === 'All' || b.s === subj) && (!qv || b.t.toLowerCase().includes(qv)));
                 $('#lib').innerHTML = bk.map(b => {
-                    const c = coverGrad(b);
-                    return `<div class="book"><button class="cover" data-open="${b.id}" style="--c1:${c[0]};--c2:${c[1]}" aria-label="${esc(b.t)}"><span class="bt">${esc(b.t)}</span><span class="bs">${esc(tr(b.s||'Uncategorized'))}</span></button><div class="bm"><span>${b.ty?esc(b.ty)+' · '+fmt(b.size):'—'}</span><button class="rc-btn" data-recolor="${b.id}" title="${tr('Cover colour')}" aria-label="${tr('Cover colour')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.8-.4-1.1-.3-.4-.4-.7-.4-1.1 0-.9.7-1.6 1.6-1.6H17a4 4 0 0 0 4-4c0-4.4-4-8.5-9-8.5z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10.5" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/></svg></button>${b.fn?`<button class="open-btn" data-open="${b.id}">${tr('Open')}</button>`:''}<button class="x" data-bdel="${b.id}" aria-label="${tr('Delete')}">${ic('x')}</button></div></div>`
+                    const c = coverGrad(b),
+                        ci = coverImg(b);
+                    return `<div class="book"><button class="cover${ci.c}" data-open="${b.id}" style="--c1:${c[0]};--c2:${c[1]}${ci.s}" aria-label="${esc(b.t)}"><span class="bt">${esc(b.t)}</span><span class="bs">${esc(tr(b.s||'Uncategorized'))}</span></button><div class="bm"><span>${b.ty?esc(b.ty)+' · '+fmt(b.size):'—'}</span><button class="rc-btn" data-recolor="${b.id}" title="${tr('Cover colour')}" aria-label="${tr('Cover colour')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.8-.4-1.1-.3-.4-.4-.7-.4-1.1 0-.9.7-1.6 1.6-1.6H17a4 4 0 0 0 4-4c0-4.4-4-8.5-9-8.5z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10.5" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/></svg></button>${b.fn?`<button class="rc-btn${b.ci?' on':''}" data-covfile="${b.id}" title="${tr('Cover from file')}" aria-label="${tr('Cover from file')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="9" cy="9" r="1.6"/><path d="m4 17 5-5 4 4 3-3 4 4"/></svg></button>`:''}${b.fn?`<button class="open-btn" data-open="${b.id}">${tr('Open')}</button>`:''}<button class="x" data-bdel="${b.id}" aria-label="${tr('Delete')}">${ic('x')}</button></div></div>`
                 }).join('') || `<p class="empty">${tr('Your library is empty. Add your first book above.')}</p>`;
                 {
                     const bs = $('#bs'),
                         cur = bs.value;
-                    bs.innerHTML = S.subjects.map(s => `<option value="${esc(s)}">${esc(tr(s))}</option>`).join('') + `<option value="__new">➕ ${tr('New subject')}</option>`;
+                    bs.innerHTML = `<option value="">${tr('None')}</option>` + S.subjects.map(s => `<option value="${esc(s)}">${esc(tr(s))}</option>`).join('') + `<option value="__new">➕ ${tr('New subject')}</option>`;
                     if ([...bs.options].some(o => o.value === cur)) bs.value = cur
                 }
                 $('#themeSw').setAttribute('aria-checked', S.theme === 'dark');
@@ -624,6 +630,33 @@
                     $$('#flt .chip').forEach(b => b.classList.toggle('on', b === f));
                     SFX.tap();
                     render();
+                    return
+                }
+                const cf = e.target.closest('[data-covfile]');
+                if (cf) {
+                    e.stopPropagation();
+                    const bk = S.books.find(x => x.id === +cf.dataset.covfile);
+                    if (!bk) return;
+                    if (bk.ci) {
+                        delete bk.ci;
+                        save();
+                        render();
+                        toast(tr('Cover reset to colour'));
+                        return
+                    }
+                    toast(tr('Creating cover…'));
+                    (async () => {
+                        try {
+                            const file = await NXSTORE.get(bk.id);
+                            if (!file) throw new Error('missing');
+                            bk.ci = await window.NXLIB.cover(file);
+                            save();
+                            render()
+                        } catch (x) {
+                            console.warn(x);
+                            toast(tr('Couldn’t create the cover'))
+                        }
+                    })();
                     return
                 }
                 const sd = e.target.closest('[data-sdel]');
@@ -1294,6 +1327,17 @@
                 return (.299 * r + .587 * g + .114 * b) / 255
             };
 
+            function coverImg(b) {
+                if (b.ci && /^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(b.ci)) return {
+                    c: ' img',
+                    s: ";background-image:url('" + b.ci + "')"
+                };
+                return {
+                    c: '',
+                    s: ''
+                }
+            }
+
             function coverGrad(b) {
                 if (b.cc && /^#[0-9a-f]{6}$/i.test(b.cc)) {
                     let base = b.cc;
@@ -1417,6 +1461,13 @@
                     c.click()
                 }
             });
+            window.__coverFile = false;
+            $('#cpFile').onclick = e => {
+                e.stopPropagation();
+                window.__coverFile = !window.__coverFile;
+                e.currentTarget.classList.toggle('on', window.__coverFile);
+                e.currentTarget.setAttribute('aria-pressed', window.__coverFile)
+            };
             $('#cpPick').onclick = e => {
                 e.stopPropagation();
                 closePop();
@@ -1466,6 +1517,13 @@
                         cc: window.__coverPick || undefined,
                         size: f ? f.size : 0
                     };
+                if (window.__coverFile && f) {
+                    try {
+                        b.ci = await window.NXLIB.cover(f)
+                    } catch (x) {
+                        console.warn(x)
+                    }
+                }
                 let mem = false;
                 if (f) {
                     let ok = true;
@@ -1504,6 +1562,9 @@
                 subj = 'All';
                 render();
                 $('#bs').value = s;
+                window.__coverFile = false;
+                $('#cpFile').classList.remove('on');
+                $('#cpFile').setAttribute('aria-pressed', 'false');
                 window.__coverPick = null;
                 $('#cpPick').style.background = '';
                 $('#cpPick').classList.remove('has');
@@ -5445,8 +5506,9 @@
                     K = $('#hmTasks');
                 if (!B || !K) return;
                 B.innerHTML = S.books.slice(-4).reverse().map(b => {
-                    const c = coverGrad(b);
-                    return `<div class="hm-b"><button class="cover" data-hopen="${b.id}" style="--c1:${c[0]};--c2:${c[1]}" aria-label="${esc(b.t)}"><span class="bt">${esc(b.t)}</span><span class="bs">${esc(tr(b.s||'Uncategorized'))}</span></button><b class="hm-bn" title="${esc(b.t)}">${esc(b.t)}</b><span class="hm-chip">${esc(b.ty||'PDF')}</span></div>`
+                    const c = coverGrad(b),
+                        ci = coverImg(b);
+                    return `<div class="hm-b"><button class="cover${ci.c}" data-hopen="${b.id}" style="--c1:${c[0]};--c2:${c[1]}${ci.s}" aria-label="${esc(b.t)}"><span class="bt">${esc(b.t)}</span><span class="bs">${esc(tr(b.s||'Uncategorized'))}</span></button><b class="hm-bn" title="${esc(b.t)}">${esc(b.t)}</b><span class="hm-chip">${esc(b.ty||'PDF')}</span></div>`
                 }).join('') || `<p class="hm-empty">${tr('Your library is empty. Add your first book above.')}</p>`;
                 const ts = S.tasks.slice().sort((a, b) => (!!a.d - !!b.d) || tSort(a, b)).slice(0, 4);
                 K.innerHTML = ts.map(x => `<div class="hm-t ${x.d?'done':''}"><button class="hm-chk" data-hid="${x.id}" role="checkbox" aria-checked="${!!x.d}" aria-label="${esc(tr(x.t))}">${ic('ck')}</button><span class="hm-tt"><b>${esc(tr(x.t))}</b><small>${tr(DIFF[x.p]||x.p)}</small></span>${x.d?`<span class="hm-ok">${tr('Completed')}</span>`:`<span class="hm-when"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>${tr('Today')}</span>`}</div>`).join('') || `<p class="hm-empty">${tr('No tasks yet. Add your first task above.')}</p>`;
@@ -5971,6 +6033,41 @@
                     closing = false
                 }, 230)
             }
+            window.NXLIB = {
+                async cover(f) {
+                    const doc = await openPdfDoc(f);
+                    try {
+                        const pg = await doc.getPage(1),
+                            v1 = pg.getViewport({
+                                scale: 1
+                            }),
+                            vp = pg.getViewport({
+                                scale: 260 / v1.width
+                            }),
+                            cv = document.createElement('canvas');
+                        cv.width = Math.round(vp.width);
+                        cv.height = Math.round(vp.height);
+                        const x = cv.getContext('2d');
+                        x.fillStyle = '#fff';
+                        x.fillRect(0, 0, cv.width, cv.height);
+                        await pg.render({
+                            canvasContext: x,
+                            viewport: vp
+                        }).promise;
+                        try {
+                            pg.cleanup()
+                        } catch (e) {}
+                        const u = cv.toDataURL('image/jpeg', .72);
+                        cv.width = 0;
+                        cv.height = 0;
+                        return u
+                    } finally {
+                        try {
+                            doc.destroy()
+                        } catch (e) {}
+                    }
+                }
+            };
             $('#nr-close').onclick = closeReader;
             $('#nr-download').onclick = () => {
                 if (!file) return;
