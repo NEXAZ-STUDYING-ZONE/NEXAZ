@@ -10717,3 +10717,42 @@ body.side-collapsed #nav a.on::before {
     color: #fff;
     border-color: transparent
 }
+
+.rc-btn+.rc-btn {
+    margin-inline-start: 0
+}
+
+.cp-btn.on,
+.rc-btn.on {
+    background: #3a5fd0;
+    color: #fff;
+    border-color: transparent
+}
+
+.cover.img {
+    background-size: cover;
+    background-position: top center;
+    background-repeat: no-repeat;
+    justify-content: flex-end;
+    gap: 4px
+}
+
+.cover.img::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 58%;
+    background: linear-gradient(to top, rgba(0, 0, 0, .78), transparent);
+    pointer-events: none
+}
+
+.cover.img .bt {
+    font-size: 15px;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, .6)
+}
+
+.cover.img .bs {
+    text-shadow: 0 1px 3px rgba(0, 0, 0, .6)
+}
